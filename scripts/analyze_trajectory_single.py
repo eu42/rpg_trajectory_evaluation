@@ -2,11 +2,19 @@
 
 import os
 import argparse
+import shutil
+
+import warnings
+warnings.filterwarnings("ignore")
 
 import numpy as np
+import matplotlib
+
+# to be able to use it without any display
+matplotlib.use('Agg')
+
 import matplotlib.pyplot as plt
 from matplotlib import rc
-import matplotlib
 from colorama import init, Fore
 
 import add_path
@@ -17,9 +25,9 @@ from multiple_traj_errors import MulTrajError
 
 init(autoreset=True)
 rc('font', **{'family': 'serif', 'serif': ['Cardo']})
-rc('text', usetex=True)
+rc('text', usetex=False)
 
-FORMAT = '.pdf'
+FORMAT = '.png'
 
 
 def analyze_multiple_trials(results_dir, est_type, n_trials,
@@ -74,9 +82,13 @@ def analyze_multiple_trials(results_dir, est_type, n_trials,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='''Analyze trajectory estimate in a folder.''')
+    parser.add_argument('groundtruth', type=str)
+    parser.add_argument('estimate', type=str)
+    '''
     parser.add_argument(
         'result_dir', type=str,
         help="Folder containing the groundtruth and the estimate.")
+    '''
     parser.add_argument(
         '--plots_dir', type=str,
         help="Folder to output plots",
@@ -106,7 +118,20 @@ if __name__ == '__main__':
     parser.set_defaults(plot=True)
     args = parser.parse_args()
 
+    # make dir with estimate filename as dirname
+    result_dir = args.estimate
+    result_dir = result_dir[:result_dir.rfind('.')]
+    # print('result_dir', result_dir)
+    args.result_dir = result_dir
+
+    if not os.path.exists(result_dir):
+        os.makedirs(result_dir)
+
     assert os.path.exists(args.result_dir)
+
+    # copy files in result_dir
+    shutil.copyfile(args.groundtruth, result_dir + '/stamped_groundtruth.txt')
+    shutil.copyfile(args.estimate, result_dir + '/stamped_traj_estimate.txt')
 
     for est_type in args.est_types:
         assert est_type in kNsToEstFnMapping
@@ -127,29 +152,37 @@ if __name__ == '__main__':
     if args.png:
         FORMAT = '.png'
 
+    '''
     print(Fore.YELLOW + "=== Summary ===")
     print(Fore.YELLOW +
           "Going to analyze the results in {0}.".format(args.result_dir))
     print(Fore.YELLOW +
           "Will analyze estimate types: {0}".format(args.est_types))
-    print(Fore.YELLOW + 
+    print(Fore.YELLOW +
           "The plots will saved in {0}.".format(plots_dirs))
+    '''
     n_trials = 1
     if args.mul_trials:
-        print(Fore.YELLOW + 
+        '''
+        print(Fore.YELLOW +
               "We will ananlyze multiple trials #{0}".format(args.mul_trials))
+        '''
         n_trials = args.mul_trials
         if len(args.mul_plot_idx) == 0:
             args.mul_plot_idx = (np.arange(args.mul_trials)).tolist()
-        print(Fore.YELLOW + 
+        '''
+        print(Fore.YELLOW +
               "We will plot trials {0}.".format(args.mul_plot_idx))
+        '''
     else:
         args.mul_plot_idx = [0]
     assert len(args.mul_plot_idx) is 1, "Multiple plots not supported yet"
 
     for est_type_i, plot_dir_i in zip(args.est_types, plots_dirs):
+        '''
         print(Fore.RED +
               "#### Processing error type {0} ####".format(est_type_i))
+        '''
         mt_error = MulTrajError()
         traj_list, mt_error = analyze_multiple_trials(
             args.result_dir, est_type_i, n_trials, args.recalculate_errors)
@@ -159,18 +192,22 @@ if __name__ == '__main__':
             print("No success runs, not plotting.")
 
         if n_trials > 1:
+            '''
             print(">>> Save results for multiple runs in {0}...".format(
                 mt_error.save_results_dir))
+            '''
             mt_error.saveErrors()
             mt_error.cache_current_error()
 
         if not args.plot:
-            print("#### Skip plotting and go to next error type.")
+            #  print("#### Skip plotting and go to next error type.")
             continue
 
+        '''
         print(Fore.MAGENTA +
               ">>> Plotting absolute error for one trajectory...")
-        fig = plt.figure(figsize=(6, 5.5))
+        '''
+        fig = plt.figure(figsize=(12, 11))
         ax = fig.add_subplot(111, aspect='equal',
                              xlabel='x [m]', ylabel='y [m]')
         pu.plot_trajectory_top(ax, plot_traj.p_es_aligned, 'b', 'Estimate')
@@ -182,7 +219,7 @@ if __name__ == '__main__':
         fig.savefig(plot_dir_i+'/trajectory_top' + '_' + plot_traj.align_str +
                     FORMAT, bbox_inches="tight")
 
-        fig = plt.figure(figsize=(6, 5.5))
+        fig = plt.figure(figsize=(12, 11))
         ax = fig.add_subplot(111, aspect='equal',
                              xlabel='x [m]', ylabel='z [m]')
         pu.plot_trajectory_side(ax, plot_traj.p_es_aligned, 'b', 'Estimate')
@@ -300,9 +337,11 @@ if __name__ == '__main__':
                     bbox_inches="tight")
         plt.close(fig)
 
+        '''
         print(Fore.GREEN +
               "#### Done processing error type {0} ####".format(est_type_i))
-    import subprocess as s
-    s.call(['notify-send', 'rpg_trajectory_evaluation finished',
-            'results in: {0}'.format(os.path.abspath(args.result_dir))])
+        '''
+    # import subprocess as s
+    # s.call(['notify-send', 'rpg_trajectory_evaluation finished',
+    #         'results in: {0}'.format(os.path.abspath(args.result_dir))])
 
